@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub 猎头分析系统 - 真实API数据版</title>
+    
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 引入 Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- 引入 FontAwesome 图标库 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- 定制配置与样式 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdfa', 100: '#ccfbf1', 500: '#14b8a6', 600: '#0d9488', 900: '#134e4a',
+                        },
+                        neutral: {
+                            50: '#f8fafc', 100: '#f1f5f9', 800: '#1e293b', 900: '#0f172a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        html { scroll-behavior: smooth; }
+        body { background-color: #f8fafc; color: #1e293b; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .chart-container {
+            position: relative; width: 100%; max-width: 600px;
+            margin-left: auto; margin-right: auto;
+            height: 350px; max-height: 400px;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .radar-container { max-width: 450px; height: 400px; }
+
+        .tab-content { display: none; opacity: 0; transition: opacity 0.3s ease-in-out; }
+        .tab-content.active { display: block; opacity: 1; }
+        .tab-btn.active { border-bottom: 2px solid #0d9488; color: #0d9488; font-weight: 600; }
+
+        /* Loading 遮罩层 */
+        #loading-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(255, 255, 255, 0.8);
+            z-index: 100; backdrop-filter: blur(4px); flex-direction: column;
+            justify-content: center; align-items: center;
+        }
+
+        @media print {
+            body { background-color: white; }
+            .no-print { display: none !important; }
+            .shadow-lg, .shadow-md, .shadow-sm { box-shadow: none !important; border: 1px solid #e2e8f0; }
+            .main-panel { grid-column: span 12 / span 12 !important; }
+            #resume-tab { display: block !important; opacity: 1 !important; }
+            #overview-tab, #tech-tab { display: none !important; }
+        }
+    </style>
+</head>
+
+<body class="font-sans antialiased">
+
+    <!-- 加载动画 -->
+    <div id="loading-overlay" class="flex">
+        <i class="fa-solid fa-circle-notch fa-spin text-brand-600 text-5xl mb-4"></i>
+        <h2 class="text-xl font-bold text-neutral-800">正在抓取 GitHub 数据并进行 AI 启发式分析...</h2>
+        <p class="text-neutral-500 mt-2 text-sm" id="loading-text">调用公开 API 中</p>
+    </div>
+
+    <!-- 顶部导航栏 -->
+    <nav class="bg-white shadow-sm sticky top-0 z-50 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <i class="fa-brands fa-github text-brand-600 text-3xl mr-3"></i>
+                    <span class="font-bold text-xl text-neutral-800 tracking-tight">GitHunter <span class="font-light text-neutral-500">Real-Time</span></span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <input type="text" id="searchInput" placeholder="输入 GitHub Username..." value="torvalds" class="bg-neutral-100 border border-neutral-200 text-sm rounded-full py-2 px-4 pl-10 focus:ring-2 focus:ring-brand-500 outline-none w-64 transition-all">
+                        <i class="fa-solid fa-search absolute left-4 top-2.5 text-neutral-400"></i>
+                    </div>
+                    <button id="searchBtn" class="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-full text-sm font-medium transition-colors shadow-sm">
+                        一键分析
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主体内容布局 -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8" id="mainContent" style="display:none;">
+        
+        <!-- 左侧：候选人简报侧边栏 -->
+        <aside class="lg:col-span-3 space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 text-center relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-brand-500 to-blue-500 opacity-20"></div>
+                <div class="relative z-10">
+                    <div class="w-24 h-24 mx-auto rounded-full border-4 border-white shadow-md overflow-hidden mb-4 bg-white">
+                        <img id="userAvatar" src="" alt="Avatar" class="w-full h-full object-cover">
+                    </div>
+                    <h2 id="userName" class="text-2xl font-bold text-neutral-900 line-clamp-1">Name</h2>
+                    <p id="userLogin" class="text-brand-600 font-medium text-sm mb-2">@username</p>
+                    <p id="userBio" class="text-neutral-500 text-xs mb-4 min-h-[40px] line-clamp-3">Bio description...</p>
+                    
+                    <div class="flex flex-wrap justify-center gap-2 mb-6">
+                        <span class="px-2 py-1 bg-neutral-100 text-neutral-600 text-xs rounded-md" id="userLocationBox">
+                            <i class="fa-solid fa-location-dot mr-1"></i><span id="userLocation">Location</span>
+                        </span>
+                        <span class="px-2 py-1 bg-brand-50 text-brand-600 text-xs rounded-md border border-brand-100" id="userCompanyBox">
+                            <i class="fa-solid fa-building mr-1"></i><span id="userCompany">Company</span>
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 text-left border-t border-neutral-100 pt-4">
+                        <div>
+                            <p class="text-xs text-neutral-400 uppercase tracking-wider">Total Stars</p>
+                            <p class="text-lg font-bold text-neutral-800" id="statStars">0 <i class="fa-solid fa-star text-yellow-400 text-sm"></i></p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-neutral-400 uppercase tracking-wider">Followers</p>
+                            <p class="text-lg font-bold text-neutral-800" id="statFollowers">0</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-neutral-400 uppercase tracking-wider">Public Repos</p>
+                            <p class="text-lg font-bold text-neutral-800" id="statRepos">0</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-neutral-400 uppercase tracking-wider">Account Age</p>
+                            <p class="text-lg font-bold text-neutral-800" id="statAge">0 年</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 社交与外部链接 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-neutral-100 p-5">
+                <h3 class="text-sm font-bold text-neutral-800 mb-3 border-l-4 border-brand-500 pl-2">数字足迹</h3>
+                <ul class="space-y-3">
+                    <li><a id="linkGithub" href="#" target="_blank" class="flex items-center text-sm text-neutral-600 hover:text-brand-600 transition-colors"><i class="fa-brands fa-github w-6 text-center text-lg"></i> <span id="textGithub">github.com/...</span></a></li>
+                    <li id="liBlog" style="display:none;"><a id="linkBlog" href="#" target="_blank" class="flex items-center text-sm text-neutral-600 hover:text-brand-600 transition-colors"><i class="fa-solid fa-link w-6 text-center text-lg"></i> <span id="textBlog">Personal Blog</span></a></li>
+                    <li id="liTwitter" style="display:none;"><a id="linkTwitter" href="#" target="_blank" class="flex items-center text-sm text-neutral-600 hover:text-brand-600 transition-colors"><i class="fa-brands fa-twitter w-6 text-center text-lg"></i> <span id="textTwitter">Twitter</span></a></li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- 右侧：主要分析面板 -->
+        <div class="lg:col-span-9 flex flex-col main-panel">
+            
+            <div class="border-b border-neutral-200 mb-6 no-print">
+                <nav class="-mb-px flex space-x-8">
+                    <button onclick="switchTab('overview')" id="btn-overview" class="tab-btn active whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-neutral-500 hover:text-neutral-700 transition-colors">
+                        <i class="fa-solid fa-chart-pie mr-2"></i>能力画像与潜力
+                    </button>
+                    <button onclick="switchTab('tech')" id="btn-tech" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-neutral-500 hover:text-neutral-700 transition-colors">
+                        <i class="fa-solid fa-code mr-2"></i>技术与代码行为剖析
+                    </button>
+                    <button onclick="switchTab('resume')" id="btn-resume" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-neutral-500 hover:text-neutral-700 transition-colors">
+                        <i class="fa-regular fa-file-lines mr-2"></i>一页纸智能简历
+                    </button>
+                </nav>
+            </div>
+
+            <!-- TAB 1: 能力画像 -->
+            <div id="overview-tab" class="tab-content active space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 flex flex-col">
+                        <h3 class="text-lg font-bold text-neutral-800 mb-4 flex items-center justify-between">
+                            <span>计算维度雷达图 <i class="fa-solid fa-circle-info text-neutral-300 text-sm ml-1 cursor-help" title="纯前端基于仓库语言、Star数和活跃度进行启发式评分计算"></i></span>
+                        </h3>
+                        <div class="chart-container radar-container flex-grow">
+                            <canvas id="abilityRadarChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6 flex flex-col justify-between">
+                        <div class="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6">
+                            <h3 class="text-lg font-bold text-neutral-800 mb-4"><i class="fa-solid fa-bolt text-yellow-500 mr-2"></i>AI 综合评价 (基于规则引擎)</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <div class="flex justify-between mb-1">
+                                        <span class="text-sm font-medium text-neutral-700">开源影响力级别</span>
+                                        <span class="text-sm font-bold text-brand-600" id="aiInfluenceLevel">评估中...</span>
+                                    </div>
+                                    <p class="text-xs text-neutral-500 leading-relaxed" id="aiInfluenceDesc">
+                                        基于获取到的 Follower 数量与 Repository 总获赞数进行评估。
+                                    </p>
+                                </div>
+                                <div class="border-t border-neutral-100 pt-3">
+                                    <div class="flex justify-between mb-1">
+                                        <span class="text-sm font-medium text-neutral-700">技术栈倾向特征</span>
+                                        <span class="text-sm font-bold text-brand-600" id="aiTechLevel">评估中...</span>
+                                    </div>
+                                    <p class="text-xs text-neutral-500 leading-relaxed" id="aiTechDesc">
+                                        分析前 100 个仓库的主要编程语言分布得出。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-2xl shadow-sm border border-neutral-700 p-6 text-white relative overflow-hidden">
+                            <div class="absolute -right-4 -bottom-4 opacity-10 text-9xl"><i class="fa-solid fa-rocket"></i></div>
+                            <h3 class="text-lg font-bold mb-3 relative z-10"><i class="fa-solid fa-seedling text-green-400 mr-2"></i>猎头系统推荐意见</h3>
+                            <p class="text-sm text-neutral-300 leading-relaxed mb-4 relative z-10" id="aiRecommendation">
+                                正在分析数据...
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: 技术剖析 -->
+            <div id="tech-tab" class="tab-content space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- 语言栈分布 -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 md:col-span-1">
+                        <h3 class="text-md font-bold text-neutral-800 mb-4">主攻语言栈 (Top Repos)</h3>
+                        <div class="chart-container" style="height: 250px;">
+                            <canvas id="languageChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 代码风格与习惯 -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 md:col-span-2">
+                        <h3 class="text-md font-bold text-neutral-800 mb-4">仓库客观数据指标</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="p-4 bg-neutral-50 rounded-lg border border-neutral-100">
+                                <h4 class="font-bold text-sm text-neutral-800 mb-1"><i class="fa-solid fa-code-fork text-blue-500 mr-2"></i>总被 Fork 数</h4>
+                                <p class="text-2xl font-bold text-neutral-700" id="statForks">0</p>
+                                <p class="text-xs text-neutral-500">反映了代码被他人二次开发或贡献的频率</p>
+                            </div>
+                            <div class="p-4 bg-neutral-50 rounded-lg border border-neutral-100">
+                                <h4 class="font-bold text-sm text-neutral-800 mb-1"><i class="fa-solid fa-scale-balanced text-green-500 mr-2"></i>开源协议意识</h4>
+                                <p class="text-2xl font-bold text-neutral-700" id="statLicense">0%</p>
+                                <p class="text-xs text-neutral-500">Top 仓库中配置了标准开源 License 的比例</p>
+                            </div>
+                            <div class="p-4 bg-neutral-50 rounded-lg border border-neutral-100">
+                                <h4 class="font-bold text-sm text-neutral-800 mb-1"><i class="fa-solid fa-triangle-exclamation text-orange-500 mr-2"></i>开放 Issue 互动</h4>
+                                <p class="text-2xl font-bold text-neutral-700" id="statIssues">0</p>
+                                <p class="text-xs text-neutral-500">目前仓库中累计未解决的开放 Issue 总量</p>
+                            </div>
+                            <div class="p-4 bg-neutral-50 rounded-lg border border-neutral-100">
+                                <h4 class="font-bold text-sm text-neutral-800 mb-1"><i class="fa-solid fa-file-code text-purple-500 mr-2"></i>原创代码占比</h4>
+                                <p class="text-2xl font-bold text-neutral-700" id="statOriginal">0%</p>
+                                <p class="text-xs text-neutral-500">排除直接 Fork 他人仓库的纯原创项目占比</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 兴趣标签云 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6">
+                    <h3 class="text-md font-bold text-neutral-800 mb-4">技术雷达 & 活跃语言关键词</h3>
+                    <div class="flex flex-wrap gap-3" id="skillsContainer">
+                        <!-- 动态填充 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: 一页纸简历 -->
+            <div id="resume-tab" class="tab-content bg-white p-8 rounded-2xl shadow-sm border border-neutral-200">
+                <div class="flex justify-end mb-4 no-print">
+                    <button onclick="window.print()" class="text-sm bg-neutral-100 hover:bg-neutral-200 text-neutral-700 px-4 py-2 rounded transition-colors flex items-center">
+                        <i class="fa-solid fa-print mr-2"></i> 导出 PDF
+                    </button>
+                </div>
+
+                <header class="border-b-2 border-neutral-800 pb-4 mb-6">
+                    <div class="flex justify-between items-end">
+                        <div>
+                            <h1 class="text-3xl font-bold text-neutral-900 mb-1" id="resumeName">Name</h1>
+                            <p class="text-lg text-neutral-600" id="resumeTitle">Senior Developer</p>
+                        </div>
+                        <div class="text-right text-sm text-neutral-500 space-y-1">
+                            <p id="resumeLocation"><i class="fa-solid fa-location-dot mr-1"></i> Location</p>
+                            <p><i class="fa-brands fa-github mr-1"></i> <span id="resumeGithub">github.com/...</span></p>
+                            <p id="resumeBlogLine"><i class="fa-solid fa-globe mr-1"></i> <span id="resumeBlog">blog</span></p>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+                    <!-- 左侧：主要经历 -->
+                    <div class="md:col-span-8 space-y-6">
+                        <section>
+                            <h2 class="text-lg font-bold text-brand-700 uppercase tracking-wide mb-4 flex items-center">
+                                <i class="fa-solid fa-laptop-code mr-2"></i> 高影响力开源项目 (Top Starred)
+                            </h2>
+                            <div class="space-y-5" id="resumeRepos">
+                                <!-- 动态插入 Top Repos -->
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- 右侧：技能与其他 -->
+                    <div class="md:col-span-4 space-y-6">
+                        <section>
+                            <h2 class="text-lg font-bold text-brand-700 uppercase tracking-wide mb-3 flex items-center border-b border-neutral-200 pb-2">
+                                <i class="fa-solid fa-layer-group mr-2"></i> 提取技术栈
+                            </h2>
+                            <div class="space-y-3" id="resumeSkills">
+                                <!-- 动态插入 -->
+                            </div>
+                        </section>
+
+                        <section class="bg-brand-50 p-4 rounded-lg border border-brand-100 mt-6">
+                            <h2 class="text-xs font-bold text-brand-800 uppercase tracking-wide mb-2 flex items-center">
+                                <i class="fa-solid fa-robot mr-1"></i> 系统分析总结
+                            </h2>
+                            <p class="text-xs text-brand-900 leading-relaxed italic" id="resumeSummary">
+                                摘要内容...
+                            </p>
+                        </section>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // --- 核心全局变量 ---
+        let radarChartInstance = null;
+        let languageChartInstance = null;
+
+        // 设置 Chart.js 全局字体
+        Chart.defaults.font.family = "'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'";
+        Chart.defaults.color = '#64748b';
+
+        // --- DOM 加载完成后绑定事件 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('searchBtn').addEventListener('click', fetchData);
+            document.getElementById('searchInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') fetchData();
+            });
+            // 默认展示 Linus Torvalds 的数据作为 Demo
+            fetchData();
+        });
+
+        // --- 切换 Tab ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(`${tabId}-tab`).classList.add('active');
+            document.getElementById(`btn-${tabId}`).classList.add('active');
+        }
+
+        // --- 核心数据获取逻辑 ---
+        async function fetchData() {
+            const usernameInput = document.getElementById('searchInput').value.trim();
+            if (!usernameInput) return;
+
+            const loading = document.getElementById('loading-overlay');
+            const mainContent = document.getElementById('mainContent');
+            const loadingText = document.getElementById('loading-text');
+            
+            loading.style.display = 'flex';
+            mainContent.style.display = 'none';
+
+            try {
+                // 并发请求 User 信息和 Repos 信息 (最多取100个最近推送的)
+                loadingText.innerText = "获取用户基础信息与代码库中...";
+                const headers = { 'Accept': 'application/vnd.github.v3+json' };
+                
+                const [userRes, reposRes] = await Promise.all([
+                    fetch(`https://api.github.com/users/${usernameInput}`, { headers }),
+                    fetch(`https://api.github.com/users/${usernameInput}/repos?per_page=100&sort=pushed`, { headers })
+                ]);
+
+                if (!userRes.ok) {
+                    if(userRes.status === 404) throw new Error('未找到该 GitHub 用户！');
+                    if(userRes.status === 403) throw new Error('触发了 GitHub API 速率限制，请稍后再试。');
+                    throw new Error('网络请求失败');
+                }
+
+                const userData = await userRes.json();
+                const reposData = await reposRes.json();
+
+                // 开始处理和分析数据
+                loadingText.innerText = "数据处理与特征提取中...";
+                processAndRender(userData, reposData);
+
+                mainContent.style.display = 'grid'; // 恢复显示
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // --- 数据处理与渲染引擎 ---
+        function processAndRender(user, repos) {
+            // 1. 基础信息渲染
+            document.getElementById('userAvatar').src = user.avatar_url;
+            document.getElementById('userName').innerText = user.name || user.login;
+            document.getElementById('userLogin').innerText = `@${user.login}`;
+            document.getElementById('userBio').innerText = user.bio || '该用户很懒，没有留下个人简介...';
+            
+            // 位置和公司处理
+            if (user.location) {
+                document.getElementById('userLocationBox').style.display = 'inline-block';
+                document.getElementById('userLocation').innerText = user.location;
+            } else {
+                document.getElementById('userLocationBox').style.display = 'none';
+            }
+
+            if (user.company) {
+                document.getElementById('userCompanyBox').style.display = 'inline-block';
+                document.getElementById('userCompany').innerText = user.company;
+            } else {
+                document.getElementById('userCompanyBox').style.display = 'none';
+            }
+
+            // 外部链接处理
+            document.getElementById('textGithub').innerText = `github.com/${user.login}`;
+            document.getElementById('linkGithub').href = user.html_url;
+
+            if (user.blog) {
+                document.getElementById('liBlog').style.display = 'block';
+                let blogUrl = user.blog.startsWith('http') ? user.blog : `https://${user.blog}`;
+                document.getElementById('linkBlog').href = blogUrl;
+                document.getElementById('textBlog').innerText = user.blog.replace(/^https?:\/\//, '');
+            } else {
+                document.getElementById('liBlog').style.display = 'none';
+            }
+
+            if (user.twitter_username) {
+                document.getElementById('liTwitter').style.display = 'block';
+                document.getElementById('linkTwitter').href = `https://twitter.com/${user.twitter_username}`;
+                document.getElementById('textTwitter').innerText = `@${user.twitter_username}`;
+            } else {
+                document.getElementById('liTwitter').style.display = 'none';
+            }
+
+            // 2. 统计仓库指标 (Stars, Languages, Forks, Original)
+            let totalStars = 0;
+            let totalForks = 0;
+            let totalIssues = 0;
+            let originalRepos = 0;
+            let licensedRepos = 0;
+            let languageCounts = {}; // { 'JavaScript': 10, 'Python': 5 }
+
+            // 过滤掉 Fork 出来的仓库以计算真实能力
+            const ownRepos = repos.filter(repo => !repo.fork);
+            
+            ownRepos.forEach(repo => {
+                totalStars += repo.stargazers_count;
+                totalForks += repo.forks_count;
+                totalIssues += repo.open_issues_count;
+                originalRepos++;
+                
+                if (repo.license) licensedRepos++;
+
+                if (repo.language) {
+                    languageCounts[repo.language] = (languageCounts[repo.language] || 0) + 1;
+                }
+            });
+
+            // 如果该用户主要是 Fork 他人代码（无原创），防除零
+            const originalRatio = repos.length === 0 ? 0 : Math.round((originalRepos / repos.length) * 100);
+            const licenseRatio = ownRepos.length === 0 ? 0 : Math.round((licensedRepos / ownRepos.length) * 100);
+
+            // 更新左侧统计
+            document.getElementById('statStars').innerHTML = `${(totalStars).toLocaleString()} <i class="fa-solid fa-star text-yellow-400 text-sm"></i>`;
+            document.getElementById('statFollowers').innerText = (user.followers).toLocaleString();
+            document.getElementById('statRepos').innerText = user.public_repos;
+            
+            // 账号年龄计算
+            const createdAt = new Date(user.created_at);
+            const ageYears = ((new Date() - createdAt) / (1000 * 60 * 60 * 24 * 365.25)).toFixed(1);
+            document.getElementById('statAge').innerText = `${ageYears} 年`;
+
+            // 更新 Tab 2 客观指标
+            document.getElementById('statForks').innerText = totalForks.toLocaleString();
+            document.getElementById('statOriginal').innerText = `${originalRatio}%`;
+            document.getElementById('statLicense').innerText = `${licenseRatio}%`;
+            document.getElementById('statIssues').innerText = totalIssues.toLocaleString();
+
+            // 3. 语言数据提取排序
+            let sortedLanguages = Object.keys(languageCounts).map(lang => {
+                return { name: lang, count: languageCounts[lang] };
+            }).sort((a, b) => b.count - a.count);
+
+            const topLanguages = sortedLanguages.slice(0, 5); // 取前5
+            const totalLangRepos = topLanguages.reduce((sum, item) => sum + item.count, 0);
+
+            // 4. Heuristic AI 计算雷达图各项分数 (满分 100)
+            let scoreArch = 50; // 底层架构 (基于C/C++/Rust/Go比例)
+            let scoreEngineering = 50; // 业务工程 (基于Java/TS/C#/Python比例)
+            let scoreInfluence = 40; // 社区影响 (基于Stars/Followers)
+            let scoreCollab = 60; // 团队协作 (基于Issue/PR交互特征)
+            let scoreAlgorithm = 40; // 算法与研究 (基于Jupyter/Python/R比例)
+
+            // 语言倾向加分规则
+            topLanguages.forEach(lang => {
+                const name = lang.name.toLowerCase();
+                const ratio = lang.count / (totalLangRepos || 1);
+                
+                if (['c', 'c++', 'rust', 'go', 'assembly'].includes(name)) scoreArch += (ratio * 40);
+                if (['java', 'typescript', 'javascript', 'c#', 'php'].includes(name)) scoreEngineering += (ratio * 40);
+                if (['python', 'jupyter notebook', 'r', 'julia'].includes(name)) {
+                    scoreAlgorithm += (ratio * 50);
+                    scoreEngineering += (ratio * 20); // Python也是很好的业务语言
+                }
+            });
+
+            // 影响力计算
+            if (user.followers > 1000 || totalStars > 5000) scoreInfluence = 98;
+            else if (user.followers > 100 || totalStars > 500) scoreInfluence = 85;
+            else if (user.followers > 20 || totalStars > 50) scoreInfluence = 70;
+            
+            // 协作规范性计算 (根据是否用开源协议、是否有原创、工龄等)
+            if (licenseRatio > 50) scoreCollab += 15;
+            if (ageYears > 5) scoreCollab += 10;
+            if (totalIssues > 100) scoreCollab += 10; // 经常处理 issue
+
+            // 修正到 0-100 区间
+            const clamp = val => Math.min(Math.max(Math.round(val), 20), 100);
+            const radarData = [clamp(scoreArch), clamp(scoreEngineering), clamp(scoreAlgorithm), clamp(scoreInfluence), clamp(scoreCollab)];
+
+            // 渲染雷达图
+            renderRadarChart(radarData);
+            // 渲染语言环形图
+            renderLanguageChart(topLanguages, totalLangRepos);
+            
+            // 5. 生成总结文案
+            generateAITexts(user, totalStars, topLanguages, radarData, ageYears);
+            
+            // 6. 渲染技能标签
+            renderSkillsTags(sortedLanguages);
+
+            // 7. 渲染一页纸简历
+            renderResume(user, ownRepos, topLanguages, totalStars);
+        }
+
+        // --- 渲染图表方法 ---
+        function renderRadarChart(dataArray) {
+            const ctx = document.getElementById('abilityRadarChart').getContext('2d');
+            if (radarChartInstance) radarChartInstance.destroy(); // 销毁旧实例
+
+            radarChartInstance = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['底层架构能力', '业务工程能力', '算法/数据科学', '社区影响力', '团队协作规范'],
+                    datasets: [{
+                        label: '估算分值',
+                        data: dataArray,
+                        backgroundColor: 'rgba(20, 184, 166, 0.2)',
+                        borderColor: '#0d9488',
+                        pointBackgroundColor: '#0d9488',
+                        pointBorderColor: '#fff',
+                        borderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(0,0,0,0.05)' },
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            pointLabels: { font: { size: 12, weight: '600' }, color: '#475569' },
+                            ticks: { display: false, min: 0, max: 100, stepSize: 20 }
+                        }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function renderLanguageChart(topLangs, totalCount) {
+            const ctx = document.getElementById('languageChart').getContext('2d');
+            if (languageChartInstance) languageChartInstance.destroy();
+
+            const labels = topLangs.map(l => l.name);
+            const data = topLangs.map(l => l.count);
+            // 若没有语言数据
+            if(data.length === 0) {
+                labels.push('Unknown');
+                data.push(1);
+            }
+
+            languageChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#3b82f6', '#eab308', '#06b6d4', '#f97316', '#8b5cf6', '#94a3b8'],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '65%',
+                    plugins: {
+                        legend: { position: 'right', labels: { usePointStyle: true, boxWidth: 8, font: { size: 12 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const val = context.raw;
+                                    const percentage = totalCount > 0 ? Math.round((val/totalCount)*100) : 0;
+                                    return ` ${context.label}: ${val} 个项目 (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- 启发式文本生成 ---
+        function generateAITexts(user, totalStars, topLangs, radarData, age) {
+            const influenceLevelEl = document.getElementById('aiInfluenceLevel');
+            const influenceDescEl = document.getElementById('aiInfluenceDesc');
+            
+            if (totalStars > 10000 || user.followers > 2000) {
+                influenceLevelEl.innerText = "S级 (行业大佬/顶级布道师)";
+                influenceDescEl.innerText = `拥有惊人的 ${totalStars} 颗星和 ${user.followers} 粉丝，其开源项目对整个行业生态有着显著影响，具备极高的个人品牌价值。`;
+            } else if (totalStars > 1000 || user.followers > 200) {
+                influenceLevelEl.innerText = "A级 (资深开源贡献者)";
+                influenceDescEl.innerText = `代码库获得了可观的关注（${totalStars} Stars），说明其产出的工具或库解决了社区真实痛点，代码质量值得信赖。`;
+            } else if (totalStars > 50) {
+                influenceLevelEl.innerText = "B级 (活跃开发者)";
+                influenceDescEl.innerText = "在开源社区有持续产出，部分项目得到了初步的社区认可，潜力上升期。";
+            } else {
+                influenceLevelEl.innerText = "潜水型/内部项目为主";
+                influenceDescEl.innerText = "公开库的 Star 较少，可能主要参与公司内部私有库开发，或偏向于将 GitHub 作为代码备份工具。";
+            }
+
+            const techLevelEl = document.getElementById('aiTechLevel');
+            const techDescEl = document.getElementById('aiTechDesc');
+            
+            if (topLangs.length > 0) {
+                const mainLang = topLangs[0].name;
+                techLevelEl.innerText = `${mainLang} 领域专家`;
+                techDescEl.innerText = `项目高度集中于 ${mainLang} 及其相关生态。前沿性与工程化倾向分数为：架构(${radarData[0]}), 工程(${radarData[1]}), 算法(${radarData[2]})。`;
+            } else {
+                techLevelEl.innerText = "未识别出主力语言";
+                techDescEl.innerText = "其公共仓库中缺乏足够包含代码语言标识的项目。";
+            }
+
+            const recommendationEl = document.getElementById('aiRecommendation');
+            let recText = `该候选人注册 GitHub 已达 ${age} 年，展现了稳定的技术热情。`;
+            if (radarData[0] >= 80) recText += "极高的架构得分表明其适合挑战性能瓶颈的底层开发岗位（如 Infra、中间件）。";
+            else if (radarData[1] >= 80) recText += "高工程分表明其能快速产出符合业务诉求的可靠代码，是全栈或后端团队的即战力。";
+            else if (radarData[2] >= 80) recText += "大量的科学计算语言特征表明其实验分析能力极强，推荐算法工程师或数据科学家岗位。";
+            
+            if (radarData[3] >= 85) recText += "强大的社区影响力更是不容忽视，可作为技术合伙人或架构委员会成员引入。";
+            
+            recommendationEl.innerText = recText;
+            document.getElementById('resumeSummary').innerText = recText;
+        }
+
+        // --- 生成技能标签云 ---
+        function renderSkillsTags(sortedLangs) {
+            const container = document.getElementById('skillsContainer');
+            container.innerHTML = '';
+            
+            if (sortedLangs.length === 0) {
+                container.innerHTML = '<span class="text-sm text-neutral-400">无明显技术标签数据</span>';
+                return;
+            }
+
+            sortedLangs.slice(0, 10).forEach((lang, index) => {
+                const span = document.createElement('span');
+                // 前三种颜色显眼，后面转为普通标签
+                if (index === 0) span.className = "px-3 py-1.5 bg-neutral-800 text-white text-sm rounded-full font-medium shadow-sm";
+                else if (index === 1 || index === 2) span.className = "px-3 py-1.5 bg-brand-100 text-brand-700 border border-brand-200 text-sm rounded-full font-medium";
+                else span.className = "px-3 py-1.5 bg-neutral-50 border border-neutral-200 text-neutral-600 text-sm rounded-full";
+                
+                span.innerText = `${lang.name}`;
+                container.appendChild(span);
+            });
+        }
+
+        // --- 生成一页纸简历 ---
+        function renderResume(user, ownRepos, topLangs, totalStars) {
+            // 基本信息
+            document.getElementById('resumeName').innerText = user.name || user.login;
+            
+            let title = "Software Engineer";
+            if(totalStars > 1000) title = "Senior Open Source Architect";
+            else if(user.public_repos > 50) title = "Senior Software Developer";
+            document.getElementById('resumeTitle').innerText = title;
+
+            document.getElementById('resumeLocation').innerHTML = `<i class="fa-solid fa-location-dot mr-1"></i> ${user.location || 'Remote/Unknown'}`;
+            document.getElementById('resumeGithub').innerText = `github.com/${user.login}`;
+            
+            if(user.blog) {
+                document.getElementById('resumeBlogLine').style.display = 'block';
+                document.getElementById('resumeBlog').innerText = user.blog;
+            } else {
+                document.getElementById('resumeBlogLine').style.display = 'none';
+            }
+
+            // 获取最高 Star 的前 3 个仓库
+            const topRepos = ownRepos.sort((a, b) => b.stargazers_count - a.stargazers_count).slice(0, 3);
+            const resumeReposContainer = document.getElementById('resumeRepos');
+            resumeReposContainer.innerHTML = '';
+
+            if (topRepos.length === 0) {
+                resumeReposContainer.innerHTML = '<p class="text-sm text-neutral-500">该账号暂无公开的原创高赞代码仓库。</p>';
+            } else {
+                topRepos.forEach((repo, index) => {
+                    const colorClass = index === 0 ? 'bg-brand-500' : 'bg-neutral-400';
+                    const timeStr = repo.updated_at ? repo.updated_at.substring(0, 10) : '';
+                    
+                    const html = `
+                    <div class="relative pl-4 border-l-2 border-neutral-200">
+                        <div class="absolute w-3 h-3 ${colorClass} rounded-full -left-[7px] top-1"></div>
+                        <div class="flex justify-between items-baseline mb-1">
+                            <h3 class="text-md font-bold text-neutral-800"><a href="${repo.html_url}" target="_blank" class="hover:underline">${repo.name}</a></h3>
+                            <span class="text-xs text-neutral-500 font-medium">Last Update: ${timeStr}</span>
+                        </div>
+                        <p class="text-sm font-medium text-neutral-600 mb-2">
+                            ${repo.language ? `<span class="px-1.5 py-0.5 bg-neutral-100 text-xs rounded mr-2 border">${repo.language}</span>` : ''}
+                            <span class="text-yellow-600 text-xs"><i class="fa-solid fa-star"></i> ${repo.stargazers_count}</span>
+                            <span class="text-neutral-400 text-xs ml-2"><i class="fa-solid fa-code-fork"></i> ${repo.forks_count}</span>
+                        </p>
+                        <ul class="list-disc pl-4 text-sm text-neutral-600 space-y-1">
+                            <li>${repo.description || '无具体项目描述。'}</li>
+                        </ul>
+                    </div>`;
+                    resumeReposContainer.insertAdjacentHTML('beforeend', html);
+                });
+            }
+
+            // 简历侧边栏技能
+            const resumeSkillsContainer = document.getElementById('resumeSkills');
+            resumeSkillsContainer.innerHTML = '';
+            
+            if (topLangs.length > 0) {
+                const topLangStr = topLangs.map(l => l.name).join(', ');
+                resumeSkillsContainer.innerHTML = `
+                    <div>
+                        <p class="text-xs font-bold text-neutral-500 mb-1">主力编程语言</p>
+                        <p class="text-sm font-medium text-neutral-800">${topLangStr}</p>
+                    </div>
+                `;
+            } else {
+                 resumeSkillsContainer.innerHTML = `<p class="text-sm text-neutral-500">无明显特征</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
