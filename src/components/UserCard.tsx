@@ -1,5 +1,5 @@
 import type { GitHubUser, RepoStats } from '../types';
-import { formatAccountAge } from '../utils/formatters';
+import { formatAccountAge, normalizeBlogUrl } from '../utils/formatters';
 import { formatNumber } from '../utils/helpers';
 
 interface UserCardProps {

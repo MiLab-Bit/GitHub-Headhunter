@@ -105,13 +105,13 @@ export function LanguageDoughnut({ langs }: LanguageDoughnutProps) {
     }],
   };
 
-  const options = {
+  const options: any = {
     responsive: true,
     maintainAspectRatio: false,
     cutout: '68%',
     plugins: {
       legend: {
-        position: 'right' as const,
+        position: 'right',
         labels: {
           usePointStyle: true,
           font: { size: 12 },
@@ -120,11 +120,11 @@ export function LanguageDoughnut({ langs }: LanguageDoughnutProps) {
       },
       tooltip: {
         callbacks: {
-          label: (ctx: { label: string; raw: number }) => ` ${ctx.label}: ${ctx.raw} 库`,
+          label: (ctx: any) => ` ${ctx.label}: ${ctx.raw} 库`,
         },
       },
     },
-  } as const;
+  };
 
   return (
     <div style={{ position: 'relative', width: '100%', height: 220 }}>
