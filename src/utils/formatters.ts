@@ -1,5 +1,3 @@
-import type { GitHubUser } from '../types';
-
 export function computeAccountAge(createdAt: string): number {
   const created = new Date(createdAt);
   const now = new Date();

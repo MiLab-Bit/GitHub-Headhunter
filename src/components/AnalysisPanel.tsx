@@ -1,12 +1,11 @@
 import type { AiAnalysisResult } from '../types';
-import { cn } from '../utils/helpers';
 
 interface AnalysisPanelProps {
   aiResult: AiAnalysisResult;
 }
 
 export function AnalysisPanel({ aiResult }: AnalysisPanelProps) {
-  const { radarScores, aiInfluenceLevel, aiInfluenceDesc, aiTechLevel, aiTechDesc, aiRecommendation } = aiResult;
+  const { aiInfluenceLevel, aiInfluenceDesc, aiTechLevel, aiTechDesc, aiRecommendation } = aiResult;
 
   return (
     <div className="space-y-6">

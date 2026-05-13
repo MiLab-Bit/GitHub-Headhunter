@@ -1,18 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { ActiveTab, LoadingProgress } from './types';
 import { useHunterData } from './hooks/useHunterData';
-import { isValidGitHubUsername, cn } from './utils/helpers';
+import { isValidGitHubUsername, cn, formatNumber } from './utils/helpers';
 import { UserCard } from './components/UserCard';
 import { AbilityRadar, LanguageDoughnut, SkillTags } from './components/AnalyticsCharts';
 import { AnalysisPanel } from './components/AnalysisPanel';
 import { ResumeView } from './components/ResumeView';
 import { LoadingOverlay } from './components/LoadingOverlay';
-import { formatNumber } from './utils/helpers';
-import { formatAccountAge } from './utils/formatters';
 
 export default function App() {
   const [username, setUsername] = useState('yyx990803');
-  const [inputValue, setInputValue] = useState('yyx990803');
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const hunter = useHunterData();
 
@@ -27,7 +24,6 @@ export default function App() {
   const handleSearch = () => {
     const trimmed = username.trim();
     if (!trimmed || !isValidGitHubUsername(trimmed)) return;
-    setInputValue(trimmed);
     hunter.search(trimmed);
   };
 

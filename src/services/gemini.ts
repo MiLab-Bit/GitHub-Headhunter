@@ -13,7 +13,7 @@ interface GeminiResponse {
   resumeSummary: string;
 }
 
-async function geminiFetch(payload: object, apiKey: string, model: string, maxRetries = 5): Promise<GeminiResponse> {
+async function geminiFetch(prompt: string, apiKey: string, model: string, maxRetries = 5): Promise<GeminiResponse> {
   const url = `${GEMINI_BASE_URL}/${model}:generateContent?key=${apiKey}`;
   let delay = 1000;
 
@@ -23,7 +23,7 @@ async function geminiFetch(payload: object, apiKey: string, model: string, maxRe
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: buildPrompt(payload) }] }],
+          contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { responseMimeType: 'application/json' },
         }),
       });
@@ -121,7 +121,8 @@ export async function analyzeWithGemini(
   }
 
   try {
-    const raw = await geminiFetch({ user, topRepos, stats, langs }, apiKey, model);
+    const prompt = buildPrompt({ user, topRepos, stats, langs });
+    const raw = await geminiFetch(prompt, apiKey, model);
 
     return {
       radarScores: mapRadarScores(raw.radarScores ?? [50, 50, 50, 50, 50]),

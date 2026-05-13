@@ -1,5 +1,4 @@
 import type { GitHubRepo } from '../types';
-import { cn } from '../utils/helpers';
 
 interface RepoListProps {
   repos: GitHubRepo[];

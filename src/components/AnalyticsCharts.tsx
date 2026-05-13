@@ -65,7 +65,7 @@ export function AbilityRadar({ scores }: AbilityRadarProps) {
         angleLines: { color: 'rgba(0,0,0,0.06)' },
         grid: { color: 'rgba(0,0,0,0.06)' },
         pointLabels: {
-          font: { size: 12, weight: '600' as const },
+          font: { size: 12, weight: 600 },
           color: '#475569',
         },
         ticks: { display: false, min: 0, max: 100, stepSize: 20 },
@@ -74,7 +74,7 @@ export function AbilityRadar({ scores }: AbilityRadarProps) {
       },
     },
     plugins: { legend: { display: false } },
-  };
+  } as const;
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 320 }}>
@@ -124,7 +124,7 @@ export function LanguageDoughnut({ langs }: LanguageDoughnutProps) {
         },
       },
     },
-  };
+  } as const;
 
   return (
     <div style={{ position: 'relative', width: '100%', height: 220 }}>

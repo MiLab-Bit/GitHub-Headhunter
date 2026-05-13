@@ -1,6 +1,4 @@
-import { useState } from 'react';
-import { formatAccountAge } from '../utils/formatters';
-import type { GitHubUser, GitHubRepo, RepoStats, LanguageStat, AiAnalysisResult } from '../types';
+import type { GitHubUser, GitHubRepo, LanguageStat, AiAnalysisResult } from '../types';
 
 interface ResumeViewProps {
   user: GitHubUser;

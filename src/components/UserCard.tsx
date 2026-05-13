@@ -1,7 +1,6 @@
-import { useState, useCallback } from 'react';
-import { cn, formatNumber, formatPercent } from '../utils/helpers';
-import { formatAccountAge, normalizeBlogUrl } from '../utils/formatters';
 import type { GitHubUser, RepoStats } from '../types';
+import { formatAccountAge } from '../utils/formatters';
+import { formatNumber } from '../utils/helpers';
 
 interface UserCardProps {
   user: GitHubUser;
