@@ -1,85 +1,142 @@
-GitHunter 🕵️‍♂️ - GitHub 猎头智能分析系统
+# GitHunter — GitHub 猎头智能分析系统
 
-GitHunter 是一个轻量级的纯前端单页应用（SPA）。只需输入一个 GitHub 用户名，系统即可通过 GitHub REST API 实时抓取该用户的公开数据，并利用内置的启发式规则引擎 (Heuristic Engine)，一键生成多维度能力画像、代码习惯特征以及一份可打印的“一页纸智能简历”。
+> 一键生成开发者能力画像、代码指纹与可打印简历。
 
-本项目专为技术猎头、HR 或希望快速了解开源开发者技术背景的技术管理者设计。
+专为技术猎头、HR 和技术管理者设计。输入任意 GitHub 用户名，AI 生成多维能力画像、代码习惯特征分析，以及一份可打印的"一页纸智能简历"。
 
-✨ 核心功能
+**[→ 立即体验](https://milab-bit.github.io/GitHub-Headhunter/)**
 
-⚡ 零部署，开箱即用：整个系统浓缩在一个 HTML 文件中，无需 Node.js 环境，无需 npm install，双击即可在浏览器运行。
+---
 
-📊 动态能力雷达图：基于真实数据（Stars、Followers、语言分布、活跃度）动态计算出的五维能力模型（底层架构、业务工程、算法研究、社区影响、团队协作）。
+## ✨ 核心功能
 
-🧬 代码习惯“指纹”提取：
+- ⚡ **零部署** — 纯前端单文件，无需服务器，开箱即用
+- 🧬 **五维能力画像** — 基于真实数据（Stars、Followers、语言分布）动态计算
+- 🕵️ **代码指纹提取** — 主力语言栈、原创比例、开源协议意识
+- 📄 **一页纸简历** — 可直接打印或导出 PDF
+- 🔄 **智能降级** — 无 API Key 时使用启发式规则，仍能生成分析
+- 🌙 **响应式设计** — 完美适配桌面端和移动端
 
-自动绘制主力语言栈分布环形图。
+---
 
-智能计算原创代码比例（排除 Fork）。
+## 🛠️ 技术栈
 
-统计总被 Fork 数和开源协议（License）使用意识。
+| 层级 | 技术 |
+|------|------|
+| 前端框架 | React 18 + TypeScript |
+| 构建工具 | Vite 5 |
+| 样式 | Tailwind CSS 3 |
+| 图表 | Chart.js + react-chartjs-2 |
+| 数据源 | GitHub REST API v3 |
+| AI 分析 | Gemini API v1beta（可选） / 启发式降级 |
+| 部署 | GitHub Pages |
 
-📄 一页纸智能简历：将零散的 GitHub 数据结构化，自动提取 Star 数最高的 Top 3 原创开源项目，支持一键打印 / 导出为 PDF。
+---
 
-🛠️ 技术栈
+## 🚀 快速开始
 
-本项目秉持“极简主义”，不依赖任何重型前端框架：
+### 安装依赖
 
-核心：HTML5 + 原生 JavaScript (ES6+)
+```bash
+npm install
+```
 
-样式：Tailwind CSS (通过 CDN 引入)
+### 开发模式
 
-图表：Chart.js (通过 CDN 引入)
+```bash
+npm run dev
+```
 
-图标：FontAwesome (通过 CDN 引入)
+访问 http://localhost:3001
 
-数据源：GitHub REST API v3
+### 构建生产版本
 
-🚀 快速开始
+```bash
+npm run build
+npm run preview
+```
 
-由于本项目是纯前端静态单文件，运行它极其简单：
+---
 
-克隆或下载本仓库到本地：
+## 📁 项目结构
 
-git clone [https://github.com/yourusername/githunter.git](https://github.com/yourusername/githunter.git)
+```
+src/
+├── main.tsx                     # 入口
+├── App.tsx                      # 主应用（状态管理 + 布局）
+├── index.css                    # 全局样式
+├── types/
+│   └── index.ts                 # TypeScript 类型定义
+├── services/
+│   ├── github.ts               # GitHub API 封装（含缓存 + 降级）
+│   └── gemini.ts               # Gemini API 调用（含 5次重试 + 启发式降级）
+├── hooks/
+│   └── useHunterData.ts        # 数据获取 hook（搜索 + 状态）
+├── components/
+│   ├── UserCard.tsx            # 用户信息卡片
+│   ├── AnalyticsCharts.tsx     # 雷达图 + 环形图 + 技能标签
+│   ├── AnalysisPanel.tsx       # AI 分析结论面板
+│   ├── ResumeView.tsx          # 一页纸简历
+│   ├── LoadingOverlay.tsx      # 加载动画
+│   └── RepoList.tsx           # 仓库列表
+└── utils/
+    ├── helpers.ts              # 通用工具（cn, debounce, etc.）
+    └── formatters.ts           # 格式化工具
+```
 
+---
 
-在项目目录中找到 github_headhunter_real.html 文件。
+## 🔧 环境变量（可选）
 
-双击该文件，使用任何现代浏览器（Chrome, Edge, Firefox, Safari）打开即可。
+创建 `.env.local`：
 
-在顶部导航栏的搜索框中输入任意 GitHub 用户名（例如：torvalds, ruanyf, antirez），点击“一键分析”。
+```env
+# GitHub Token（将 API 限速从 60次/小时 提升到 5000次/小时）
+VITE_GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 
-⚠️ 注意事项（GitHub API 限制）:
-本项目使用的是 GitHub 公开的未授权 API。GitHub 对未授权请求有 60次/小时 的速率限制（Rate Limit）。如果频繁查询导致被限制，请稍候再试，或在代码中配置您自己的 Personal Access Token。
+# Gemini API Key（不填则使用启发式分析）
+VITE_GEMINI_API_KEY=your_gemini_api_key
 
-🧠 关于“启发式 AI 评估”算法
+# Gemini 模型（默认 gemini-2.0-flash）
+VITE_GEMINI_MODEL=gemini-2.0-flash
+```
 
-本项目由于是纯前端实现，并未连接真实的 LLM（大语言模型）。简历中的“AI 分析”实际上是基于一套预设的前端启发式规则引擎。部分核心打分逻辑如下：
+---
 
-底层架构能力：当用户的 Top 仓库大量使用 C, C++, Rust, Go, Assembly 时，该项得分会显著增加。
+## ⚠️ GitHub API 限制
 
-业务工程能力：当用户的 Top 仓库大量使用 Java, TypeScript, JavaScript, C#, PHP 时，该项得分会显著增加。
+未授权 API 有 **60 次/小时** 的限速。建议：
 
-算法与数据科学：当识别到 Python, Jupyter Notebook, R, Julia 等语言时增加。
+1. **添加 GitHub Token**（免费，无需特殊权限）
+2. 使用 **localStorage 缓存**（5 分钟内重复查询不消耗配额）
 
-社区影响力：综合考量用户的 Followers 数量以及名下原创仓库的总 Stars 数量。
+---
 
-团队协作规范：基于仓库的 Issue 处理活跃度、账号注册年限、以及为仓库配置 License 的比例进行加成。
+## 📝 开发说明
 
-📅 TODO / 未来规划
+```bash
+# 代码检查
+npm run lint
 
-[ ] 支持输入 GitHub Personal Access Token 以突破每小时 60 次的查询限制。
+# 代码格式化
+npm run format
+```
 
-[ ] 接入真实的 OpenAI / DeepSeek API，根据项目的 README 动态生成更精准的 AI 评价。
+---
 
-[ ] 增加组织/公司维度的社交图谱分析。
+## 📄 文档
 
-[ ] 支持暗黑模式 (Dark Mode)。
+- [SPEC.md](./SPEC.md) — 功能规格文档
+- [ROADMAP.md](./ROADMAP.md) — 版本路线图
 
-🤝 参与贡献
+---
 
-欢迎提交 Pull Requests 或开启 Issue 讨论！如果您有更好的启发式算法规则来评估开发者能力，非常欢迎提交代码优化。
+## 🤝 参与贡献
 
-📄 开源协议
+欢迎提交 Issue 和 Pull Request！
 
-本项目基于 MIT License 开源，您可以自由地使用、修改和分发。
+---
+
+## 📄 许可证
+
+MIT License
